@@ -6,11 +6,11 @@ plugins {
 // To change the project name, edit the settings.gradle file
 
 project.ext.modID = "terraformer" // The unique id of your mod. Must be all lowercase and cannot use special characters.
-project.ext.modName = "Terraformer" // The display name of your mod.
-project.ext.modVersion = "1.1.8" // Your current builds version. Must follow the xx.xx... format.
-project.ext.gameVersion = "0.33.0" // The target game version.
+project.ext.modName = "Terraformer Fix" // The display name of your mod.
+project.ext.modVersion = "1.0.0" // Your current builds version. Must follow the xx.xx... format.
+project.ext.gameVersion = "1.3.2" // The target game version.
 project.ext.modDescription = "A set of tools for bulk building and terraforming on your island." // Short description of what your mod is.
-project.ext.author = "FerrenFx" // Your name
+project.ext.author = "Xeraphire" // Your name
 
 /**
  * When setting clientside to true, it means servers do not need this mod for clients to connect and vice versa.
@@ -27,8 +27,12 @@ project.ext.clientside = false
 //project.ext.modDependencies = ["other.modid1", "other.modid2"]
 //project.ext.modOptionalDependencies = ["optional.modid1", "optional.modid2"]
 
-// The path to the games install directory
-def gameDirectory = "E:/SteamLibrary/steamapps/common/Necesse"
+// The path to the games install directory (supports both macOS and Windows)
+def defaultGameDirectory = System.getProperty("os.name").toLowerCase().contains("mac") ?
+        System.getProperty("user.home") + "/Library/Application Support/Steam/steamapps/common/Necesse/Necesse.app/Contents/Resources" :
+        "C:/Program Files (x86)/Steam/steamapps/common/Necesse"
+
+def gameDirectory = project.findProperty("gameDirectory") ?: defaultGameDirectory
 
 // =================================================
 // ========== DO NOT EDIT BELOW THIS LINE ==========
@@ -40,8 +44,8 @@ def jarName = "${project.ext.modName.replace(" ", "")}-${project.ext.gameVersion
 group project.ext.modID
 version project.ext.modVersion
 
-setSourceCompatibility(JavaVersion.VERSION_1_8)
-setTargetCompatibility(JavaVersion.VERSION_1_8)
+setSourceCompatibility(JavaVersion.VERSION_17)
+setTargetCompatibility(JavaVersion.VERSION_17)
 
 repositories {
     mavenCentral()

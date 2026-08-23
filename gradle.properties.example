@@ -1,0 +1,5 @@
+# Example gradle.properties
+# Set your Java 17+ home path if not set in PATH:
+# org.gradle.java.home=/path/to/java-17
+# Set custom game directory if Necesse is not installed in standard Steam location:
+# gameDirectory=/path/to/Necesse

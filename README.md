@@ -1,55 +1,47 @@
 # Terraformer
 
-![Preview](./preview.png)  
+![Preview](./preview.png)
 
-## Overview  
-Terraformer is a landscaping tool that allows the bulk placement and removal of tiles. Find it for purchase at your nearest elder. Get it while it's hot cause I'm definitely increasing the price.
+A landscaping and construction tool for Necesse that allows bulk placement and removal of tiles, objects, and liquids.
+
+## Overview
+
+Adds two tools purchased from the Elder (5,000 coins each):
+* **Terraformer**: Place and remove tiles (dirt, stone, grass, wood, etc.) and liquids (water, lava).
+* **Builder**: Place and remove objects, walls, and furniture.
 
 ## Features
 
-### Adjustable shapes and sizes
+### Shapes and Sizes
+Choose from square, checkerboard, line, circle, ring, or line box shapes. Open the settings menu by right-clicking the item in your inventory.
 
-Choose from square shape, line shape, circle shape or ring shape. Adjust the sizes of your shape through the item's interface or by using in-game hotkeys.
+![Preview Menu](./preview_menu.png)
 
-![Preview](./preview_menu.png)  
+You can also adjust the shape size with in-game hotkeys:
+* `.` (Period): Size up
+* `,` (Comma): Size down
 
-![Preview](./preview1.gif)  
+### Bulk Placement & Removal
+![Bulk Building](./preview1.gif)
 
-![Preview](./preview3.gif)  
+![Shape Building](./preview3.gif)
 
-### Scoop and place liquids.
+### Scoop and Place Liquids
+![Liquid Scooping](./preview2.gif)
 
-![Preview](./preview2.gif)  
+## How It Works
 
-## Information
+* **Left-Click**: Place stored tiles/objects in the selected shape.
+* **Right-Click**: Scoop/remove matching tiles, liquids, or objects.
+* **Right-Click (in inventory)**: Open settings menu.
+* When scooping, only the tile/object type currently stored in the tool will be collected. If the tool is empty, the first tile targeted (marked in orange) is selected.
+* Any collected items that exceed the tool's capacity go to your inventory.
+* Line direction is based on the character's facing direction.
+* Both items can be upgraded at the Upgrade Station for increased range and shape size.
 
-* This item can be purchased at the Elder for 5,000 coins. This may change in future updates.
-* There is a range limit that will be upgradeable in the future. Red squares are out-of range. You can still place tiles, but it will only fill green tiles.
-* There is a size limit that will be upgradeable in the future. The maximum width of any shape is currently 10 tiles.
-* When scooping tiles, only the tile type that is in your bucket currently will be scooped. If there are no tiles in your bucket, the top left tile (yellow highlight) will be selected as the type of tile to scoop.
-* When placing tiles, the placed tiles will be added to the inventory.
-* When scooping tiles, overflow will be placed into the player's inventory.
-* The direction of the line is based on the character's facing in-game.
-* **Upgradeable** You can upgrade this item at the `Upgrade Station` for greater range and size.
+![Upgrade Station](./preview_upgrade.png)
 
-## Known 'Bugs'
-* When you place objects on water, breaking one of the objects will break all neighboring objects. This is by design in the base game, and I do not plan to modify this for now. Really, you shouldn't be able to place objects on water at all, but it looks cool so I'll secretly keep it.
+## Credits
 
-## Feedback & Support  
-If you encounter any issues or have feature suggestions, feel free to reach out! @ferrenfx on Necesse's discord's #modding channel.
-
-## Update History
-
-1.1.8 - Patch for necesse 0.33.0  
-
-
-1.1.7 - Hotfix for DS issues.
-
-
-1.1.6 - Hotfix for item not showing up in elder shop.  
-
-
-1.1.5 - Hotfix for builder upgrade items.  
-
-
-1.1.4 - Updated to Necesse patch 0.32.0. Moved the `Upgrade Station` recipe to the `Tungsten Workstation` and changed the ingredients for it.  
+* Maintained by Xeraphire
+* Original Mod by FerrenFx: [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3453342401)

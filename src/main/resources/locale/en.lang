@@ -12,6 +12,7 @@ decreasesize=Shape Size -
 increasesize=Shape Size +
 shapeadjustment=Size:
 shapeslector=Select Shape
+shapeselector=Select Shape
 
 [constructor.shapes]
 square=Square

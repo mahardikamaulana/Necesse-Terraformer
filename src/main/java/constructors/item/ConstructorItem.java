@@ -6,21 +6,23 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import constructors.ConstructorsMod;
 import necesse.engine.GameState;
-import necesse.engine.input.Control;
 import necesse.engine.localization.Localization;
 import necesse.engine.network.gameNetworkData.GNDItemMap;
 import necesse.engine.util.GameBlackboard;
 import necesse.engine.world.GameClock;
 import necesse.engine.world.WorldSettings;
 import necesse.entity.Entity;
+import necesse.entity.TileEntity;
 import necesse.entity.mobs.Mob;
 import necesse.entity.mobs.PlayerMob;
 import necesse.entity.mobs.itemAttacker.ItemAttackSlot;
 import necesse.entity.mobs.itemAttacker.ItemAttackerMob;
 import necesse.gfx.GameColor;
 import necesse.gfx.camera.GameCamera;
-import necesse.gfx.drawables.SortedDrawable;
+import necesse.gfx.gameTexture.GameSprite;
+import necesse.gfx.gameTexture.GameTexture;
 import necesse.gfx.gameTooltips.ListGameTooltips;
 import necesse.inventory.Inventory;
 import necesse.inventory.InventoryItem;
@@ -28,7 +30,6 @@ import necesse.inventory.item.ItemInteractAction;
 import necesse.inventory.item.ItemStatTip;
 import necesse.inventory.item.ItemStatTipList;
 import necesse.inventory.item.LocalMessageDoubleItemStatTip;
-import necesse.inventory.item.TickItem;
 import necesse.inventory.item.miscItem.PouchItem;
 import necesse.inventory.item.upgradeUtils.IntUpgradeValue;
 import necesse.inventory.item.upgradeUtils.UpgradableItem;
@@ -38,59 +39,151 @@ import necesse.level.maps.Level;
 import necesse.level.maps.LevelTile;
 import necesse.level.maps.TilePosition;
 
-public abstract class ConstructorItem extends PouchItem implements TickItem, UpgradableItem, ItemInteractAction {
+public abstract class ConstructorItem extends PouchItem implements UpgradableItem, ItemInteractAction {
 
 	public static enum Shape {
 		SQUARE,
 		CHECKERBOARD,
 		LINE,
 		CIRCLE,
-		RING, LINE_BOX
+		RING,
+		LINE_BOX
 	}
 	
 	public static enum LineDirection {
-        HORIZONTAL, 
-        VERTICAL,
-        DIAGONAL_TL_BR,
-        DIAGONAL_TR_BL
-    }
+		HORIZONTAL, 
+		VERTICAL,
+		DIAGONAL_TL_BR,
+		DIAGONAL_TR_BL
+	}
 	
 	public static final int MAX_UPGRADE_TIER = 5;
 	
-	public Map<Shape, ShapeSelection> shapes = new HashMap<Shape, ShapeSelection>();
-	
+	public final Map<Shape, ShapeSelection> shapes = new HashMap<Shape, ShapeSelection>();
 	protected boolean shapes_initialized = false;
 	
-	private long lastActivationEventTime;
-	protected boolean active = false;
-	
-	protected SortedDrawable highlightDraw;
-	
-	protected LevelTile[][] currentlyHighlightedTiles;
-	protected ShapeSelection currentShape;
-	
-	protected IntUpgradeValue maxPlacementRange;
-	protected IntUpgradeValue maxShapeSize;
-	protected int minShapeSize = 1;
-	protected int shapeSize = 4;
+	public IntUpgradeValue maxPlacementRange;
+	public IntUpgradeValue maxShapeSize;
+	public int minShapeSize = 1;
 	
 	public ConstructorItem() {
-		
 		super();	
-		
 		initializeShapes();
 		
-		this.maxPlacementRange = new IntUpgradeValue(12, 0.5F);
-		this.maxShapeSize = new IntUpgradeValue(6, 0.4F);
+		this.maxPlacementRange = new IntUpgradeValue();
+		this.maxPlacementRange.setBaseValue(12);
+		this.maxPlacementRange.setUpgradedValue(1.0F, 16);
+		this.maxPlacementRange.setUpgradedValue(2.0F, 20);
+		this.maxPlacementRange.setUpgradedValue(3.0F, 26);
+		this.maxPlacementRange.setUpgradedValue(4.0F, 32);
+		this.maxPlacementRange.setUpgradedValue(5.0F, 40);
+
+		this.maxShapeSize = new IntUpgradeValue();
+		this.maxShapeSize.setBaseValue(5);
+		this.maxShapeSize.setUpgradedValue(1.0F, 7);
+		this.maxShapeSize.setUpgradedValue(2.0F, 9);
+		this.maxShapeSize.setUpgradedValue(3.0F, 11);
+		this.maxShapeSize.setUpgradedValue(4.0F, 13);
+		this.maxShapeSize.setUpgradedValue(5.0F, 15);
 		
 		this.stackSize = 1;			
 		this.attackCooldownTime = new IntUpgradeValue().setBaseValue(100);			
 		this.rarity = Rarity.UNIQUE;
-		
-		this.setShape(Shape.SQUARE);		
-		
-		updateShapes(null);
+	}
 
+	protected GameTexture[] tierTextures;
+
+	@Override
+	protected void loadItemTextures() {
+		super.loadItemTextures();
+		this.tierTextures = new GameTexture[MAX_UPGRADE_TIER + 1];
+		this.tierTextures[0] = this.itemTexture;
+		for (int i = 1; i <= MAX_UPGRADE_TIER; i++) {
+			this.tierTextures[i] = GameTexture.fromFile("items/" + this.getStringID() + "_tier" + i, this.itemTexture);
+		}
+	}
+
+	@Override
+	public GameSprite getItemSprite(InventoryItem item, PlayerMob player) {
+		if (item != null && this.tierTextures != null) {
+			int tier = Math.max(0, Math.min(MAX_UPGRADE_TIER, (int) this.getUpgradeTier(item)));
+			if (tier < this.tierTextures.length && this.tierTextures[tier] != null) {
+				return new GameSprite(this.tierTextures[tier]);
+			}
+		}
+		return super.getItemSprite(item, player);
+	}
+
+	@Override
+	public GameSprite getWorldItemSprite(InventoryItem item, PlayerMob player) {
+		if (item != null && this.tierTextures != null) {
+			int tier = Math.max(0, Math.min(MAX_UPGRADE_TIER, (int) this.getUpgradeTier(item)));
+			if (tier < this.tierTextures.length && this.tierTextures[tier] != null) {
+				return new GameSprite(this.tierTextures[tier]);
+			}
+		}
+		return super.getWorldItemSprite(item, player);
+	}
+
+	public Shape getShape(InventoryItem item) {
+		if (item == null) return Shape.SQUARE;
+		String shapeName = item.getGndData().getString("shape", Shape.SQUARE.name());
+		try {
+			return Shape.valueOf(shapeName);
+		} catch (Exception e) {
+			return Shape.SQUARE;
+		}
+	}
+
+	public void setShape(InventoryItem item, Shape shape) {
+		if (item != null && shape != null) {
+			item.getGndData().setString("shape", shape.name());
+		}
+	}
+
+	public ShapeSelection getShapeSelection(InventoryItem item) {
+		Shape shape = getShape(item);
+		ShapeSelection selection = shapes.get(shape);
+		return selection != null ? selection : shapes.get(Shape.SQUARE);
+	}
+
+	public LevelTile[][] getTargetTiles(InventoryItem item, PlayerMob player, TilePosition pos) {
+		if (item == null || player == null || pos == null) return new LevelTile[0][0];
+		ShapeSelection selection = getShapeSelection(item);
+		int size = getShapeSize(item);
+		return selection.getTilesAround(player, pos, size);
+	}
+
+	public int getShapeSize(InventoryItem item) {
+		if (item == null) return this.minShapeSize;
+		int maxSize = this.maxShapeSize.getValue(this.getUpgradeTier(item));
+		int savedSize = item.getGndData().getInt("shapeSize", 3);
+		return Math.max(this.minShapeSize, Math.min(maxSize, savedSize));
+	}
+
+	public void setShapeSize(InventoryItem item, int size) {
+		if (item != null) {
+			int maxSize = this.maxShapeSize.getValue(this.getUpgradeTier(item));
+			int clamped = Math.max(this.minShapeSize, Math.min(maxSize, size));
+			item.getGndData().setInt("shapeSize", clamped);
+		}
+	}
+
+	public void modShapeSize(int mod, InventoryItem item) {
+		if (item != null) {
+			int current = getShapeSize(item);
+			setShapeSize(item, current + mod);
+		}
+	}
+
+	public int getMaxPlacementRange(InventoryItem item) {
+		if (item == null) return this.maxPlacementRange.getValue(0.0F);
+		return this.maxPlacementRange.getValue(this.getUpgradeTier(item));
+	}
+
+	public int getMaxShapeSize(InventoryItem item) {
+		if (item == null) return this.maxShapeSize.getValue(0.0F);
+		return this.maxShapeSize.getValue(this.getUpgradeTier(item));
 	}
 
 	public ListGameTooltips getPreEnchantmentTooltips(InventoryItem item, PlayerMob perspective,
@@ -101,15 +194,16 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 		if (equippedMob == null) {
 			equippedMob = (ItemAttackerMob) blackboard.get(ItemAttackerMob.class, "perspective", perspective);
 		}
-
 		if (equippedMob == null) {
 			equippedMob = perspective;
 		}
 		tooltips.add(new necesse.gfx.gameTooltips.SpacerGameTooltip(12));
 		this.addStatTooltips(tooltips, item, (InventoryItem) blackboard.get(InventoryItem.class, "compareItem"),
 				blackboard.getBoolean("showDifference"), blackboard.getBoolean("forceAdd"),
-				(ItemAttackerMob) equippedMob);
-		tooltips.add(new necesse.engine.localization.message.LocalMessage("constructor.ui","itemupgradeable"));
+				equippedMob);
+		if (this.getUpgradeTier(item) < (float) MAX_UPGRADE_TIER) {
+			tooltips.add(new necesse.engine.localization.message.LocalMessage("constructor.ui", "itemupgradeable"));
+		}
 		return tooltips;
 	}
 
@@ -118,14 +212,15 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 		return new ListGameTooltips();
 	}
 
+	@Override
 	public final ListGameTooltips getTooltips(InventoryItem item, PlayerMob perspective, GameBlackboard blackboard) {
 		ListGameTooltips tooltips = super.getTooltips(item, perspective, blackboard);
 		tooltips.add(this.getPreEnchantmentTooltips(item, perspective, blackboard));
-		//tooltips.add(this.getEnchantmentTooltips(item));
 		tooltips.add(this.getPostEnchantmentTooltips(item, perspective, blackboard));
 		return tooltips;
 	}
 	
+	@Override
 	public String getCanBeUpgradedError(InventoryItem item) {			
 		return this.getUpgradeTier(item) >= (float) MAX_UPGRADE_TIER
 				? Localization.translate("constructor.ui", "itemupgradelimit")
@@ -135,60 +230,36 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 	@Override
 	public void addUpgradeStatTips(ItemStatTipList list, InventoryItem lastItem, InventoryItem upgradedItem,
 			ItemAttackerMob perspective, ItemAttackerMob statPerspective) {
+		float tier = this.getUpgradeTier(upgradedItem);
+		float lastTier = lastItem == null ? tier : this.getUpgradeTier(lastItem);
 		
-		ItemStatTip tierTip = (new LocalMessageDoubleItemStatTip("item", "tier", "tiernumber",
-				(double) this.getUpgradeTier(upgradedItem), 2)).setCompareValue((double) this.getUpgradeTier(lastItem))
-				.setToString((tier) -> {
-					int floorTier = (int) tier;
-					double percentAdd = tier - (double) floorTier;
-					return percentAdd != 0.0
-							? floorTier + " (+" + (int) (percentAdd * 100.0) + "%)"
-							: String.valueOf(floorTier);
-				});		
+		ItemStatTip tierTip = new LocalMessageDoubleItemStatTip("itemtooltip", "tooltier", "value", (double) tier, 0)
+				.setCompareValue((double) lastTier);
 		list.add(Integer.MIN_VALUE, tierTip);
 		this.addStatTooltips(list, upgradedItem, lastItem, perspective, true);
-		
 	}
 	
 	public final void addStatTooltips(ListGameTooltips tooltips, InventoryItem currentItem, InventoryItem lastItem,
 			boolean showDifference, boolean forceAdd, ItemAttackerMob perspective) {
 		ItemStatTipList list = new ItemStatTipList();
 		this.addStatTooltips(list, currentItem, lastItem, perspective, forceAdd);
-		Iterator<ItemStatTip> var8 = list.iterator();
-		while (var8.hasNext()) {
-			ItemStatTip itemStatTip = (ItemStatTip) var8.next();
+		Iterator<ItemStatTip> it = list.iterator();
+		while (it.hasNext()) {
+			ItemStatTip itemStatTip = it.next();
 			tooltips.add(itemStatTip.toTooltip((Color) GameColor.GREEN.color.get(), (Color) GameColor.RED.color.get(),
 					(Color) GameColor.YELLOW.color.get(), showDifference));
 		}
-
 	}
 	
-	public void addToolTierTip(ItemStatTipList list, InventoryItem currentItem, InventoryItem lastItem,
-			boolean forceAdd) {
-		float tier = this.getUpgradeTier(currentItem);
-		float lastTier = lastItem == null ? tier : this.getUpgradeTier(lastItem);
-		if (tier != lastTier || forceAdd) {
-			LocalMessageDoubleItemStatTip tip = new LocalMessageDoubleItemStatTip("itemtooltip", "tooltier", "value", (double) tier,
-					1);
-			if (lastItem != null) {
-				tip.setCompareValue((double) lastTier);
-			}
-
-			list.add(60, tip);
-		}
-
-	}
-
 	public void addMaxRangeTip(ItemStatTipList list, InventoryItem currentItem, InventoryItem lastItem,
 			Mob perspective, boolean forceAdd) {
-		
 		int currentMaxRange = this.maxPlacementRange.getValue(this.getUpgradeTier(currentItem));
 		LocalMessageDoubleItemStatTip tip = new LocalMessageDoubleItemStatTip("constructor.itemtooltip", "rangetip", "value",
-			currentMaxRange, 1);
+			(double) currentMaxRange, 0);
 		
 		if (lastItem != null) {
 			int lastMaxRange = this.maxPlacementRange.getValue(this.getUpgradeTier(lastItem));
-			tip.setCompareValue(lastMaxRange);
+			tip.setCompareValue((double) lastMaxRange);
 		}
 
 		list.add(250, tip);
@@ -196,116 +267,57 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 	
 	public void addMaxSizeTip(ItemStatTipList list, InventoryItem currentItem, InventoryItem lastItem,
 			Mob perspective, boolean forceAdd) {
-		
 		int currentMaxSize = this.maxShapeSize.getValue(this.getUpgradeTier(currentItem));
 		LocalMessageDoubleItemStatTip tip = new LocalMessageDoubleItemStatTip("constructor.itemtooltip", "sizetip", "value",
-				currentMaxSize, 1);
+				(double) currentMaxSize, 0);
 		
 		if (lastItem != null) {
 			int lastMaxSize = this.maxShapeSize.getValue(this.getUpgradeTier(lastItem));
-			tip.setCompareValue(lastMaxSize);
+			tip.setCompareValue((double) lastMaxSize);
 		}
 
-		list.add(250, tip);
+		list.add(260, tip);
 	}
 	
 	public void addStatTooltips(ItemStatTipList list, InventoryItem currentItem, InventoryItem lastItem,
 			ItemAttackerMob perspective, boolean forceAdd) {
-		
 		this.addMaxRangeTip(list, currentItem, lastItem, perspective, forceAdd);
 		this.addMaxSizeTip(list, currentItem, lastItem, perspective, forceAdd);
 	}
 	
-	
-	
 	protected int getNextUpgradeTier(InventoryItem item) {
-		int currentTier = (int) item.item.getUpgradeTier(item);
-		int nextTier = currentTier + 1;
-		
-		float baseSizeValue = this.maxShapeSize.getValue(0.0F);
-		float nextTierValue = this.maxShapeSize.getValue((float) nextTier);
-		
-		if (nextTier == 1 && baseSizeValue < nextTierValue) {
-			return nextTier;
-		} else {
-			while (baseSizeValue / nextTierValue > 1.0F - this.maxShapeSize.defaultLevelIncreaseMultiplier / 4.0F
-					&& nextTier < currentTier + 100) {
-				++nextTier;
-				nextTierValue = this.maxShapeSize.getValue((float) nextTier);
-			}
-
-			return nextTier;
-		}
+		int currentTier = (int) this.getUpgradeTier(item);
+		return Math.min(MAX_UPGRADE_TIER, currentTier + 1);
 	}
 	
 	@Override
 	public UpgradedItem getUpgradedItem(InventoryItem item) {
-		
 		int nextTier = this.getNextUpgradeTier(item);
 		InventoryItem upgradedItem = item.copy();
-		upgradedItem.item.setUpgradeTier(upgradedItem, (float) nextTier);
-
+		this.setUpgradeTier(upgradedItem, (float) nextTier);
 		return new UpgradedItem(item, upgradedItem, this.getSpecialUpgradeCost(nextTier));
 	}
 	
 	protected abstract Ingredient[] getSpecialUpgradeCost(int nextTier);
 
-	protected float getTier1CostPercent(InventoryItem item) {
-		return this.maxShapeSize.getValue(0.0F) / this.maxShapeSize.getValue(1.0F);
-	}
-	
-	private void updateShapes(InventoryItem _me) {
-		this.setShapeMaxSize(_me != null ? maxShapeSize.getValue(this.getUpgradeTier(_me)) : maxShapeSize.defaultValue);
-		this.setShapeSize(shapeSize);
-		this.updateContainerForm();	
-	}
-	
-	protected abstract void updateContainerForm();
-	
-	private void setShapeSize(int i) {
-		this.shapeSize = i;
-	}
-	
-	private void setShapeMaxSize(int i) {
-		this.maxShapeSize.setBaseValue(i);
-	}
-	
-	public int getCurrentShapeSize() {
-		return this.shapeSize;
-	}
-	
-	public void modShapeSize(int mod, InventoryItem _me) {
-		this.shapeSize += mod;
-		this.shapeSize = Math.min(this.maxShapeSize.getValue(this.getUpgradeTier(_me)), Math.max(this.minShapeSize, this.shapeSize));
-		updateShapes(_me);			
-	}
-	
 	public abstract void initializeShapes();
 	
-	public void setShape(Shape shapeID) {
-		this.currentShape = shapes.get(shapeID);	
-	}
+	protected void clearOutOfRangeTiles(LevelTile[][] cloneTiles, PlayerMob perspective, int range) {
+		int rangeSq = range * range;
+		int playerTileX = perspective.getTileX();
+		int playerTileY = perspective.getTileY();
 
-	protected void onDeactivateEvent() {}
-
-	protected void onActivateEvent() {}
-	
-	protected void clearOutOfRangeTiles(LevelTile[][] cloneTiles, PlayerMob perspective, int _range) {
-		for(int i=0;i<cloneTiles.length;i++) {
-			for(int j=0;j<cloneTiles[i].length;j++) {
+		for (int i = 0; i < cloneTiles.length; i++) {
+			for (int j = 0; j < cloneTiles[i].length; j++) {
 				LevelTile targetTile = cloneTiles[i][j];
-				if(targetTile==null) continue;
-				int tileX = targetTile.tileX;
-				int tileY = targetTile.tileY;	
-									
-				int dx = tileX - perspective.getTileX();
-				int dy = tileY - perspective.getTileY();
-				if((dx * dx + dy * dy) > (_range * _range)) {
-					cloneTiles[i][j]=null;
+				if (targetTile == null) continue;
+				int dx = targetTile.tileX - playerTileX;
+				int dy = targetTile.tileY - playerTileY;
+				if ((dx * dx + dy * dy) > rangeSq) {
+					cloneTiles[i][j] = null;
 				}
 			}
 		}
-		
 	}
 	
 	@Override
@@ -325,54 +337,34 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 	public abstract void onMouseHoverTile(InventoryItem me, GameCamera camera, PlayerMob perspective, int mouseX, int mouseY,
 			TilePosition pos, boolean isDebug);
 	
-	
-	
-	private boolean isSizeUpPressed = false;
-	private boolean isSizeDownPressed = false;
-	
 	@Override
 	public void tick(Inventory arg0, int arg1, InventoryItem me, GameClock arg3, GameState arg4, Entity arg5,
-	                 WorldSettings arg6, Consumer<InventoryItem> arg7) {
-	    super.tick(arg0, arg1, me, arg3, arg4, arg5, arg6, arg7);
+	                 TileEntity arg6, WorldSettings arg7, Consumer<InventoryItem> arg8) {
+	    super.tick(arg0, arg1, me, arg3, arg4, arg5, arg6, arg7, arg8);
 	    
 	    if (!(arg5 instanceof PlayerMob)) return;
 	   
 	    PlayerMob p = (PlayerMob) arg5;
-	    if (p.getSelectedItem() == null) return;
-	    
-	    boolean itemSelected = p.getSelectedItem().item == this;
-	    long currentTime = arg3.getTime();
-
-	    // Handle activation toggle with a delay
-	    if ((currentTime - lastActivationEventTime) / 1000.0 > 0.5) {
-	        if (itemSelected && !this.active) {
-	            this.active = true;
-	            lastActivationEventTime = currentTime;
-	            this.onActivateEvent();
+	    // Only the local client controlling this player, and ONLY the actively selected item slot should process hotkeys
+	    if (p.isClient() && p.isClientClient() && p.getSelectedItem() == me) {
+	        necesse.engine.network.client.Client client = p.getClientClient() != null ? p.getClientClient().getClient() : (p.getLevel() != null ? p.getLevel().getClient() : null);
+	        if (client != null && !client.hasFocusForm()) {
+	            boolean sizeUp = ConstructorsMod.SIZE_UP != null && ConstructorsMod.SIZE_UP.isPressed();
+	            boolean sizeDown = ConstructorsMod.SIZE_DOWN != null && ConstructorsMod.SIZE_DOWN.isPressed();
+	            
+	            if (sizeUp || sizeDown) {
+	                int delta = sizeUp ? 1 : -1;
+	                modShapeSize(delta, me);
+	                int actualSize = getShapeSize(me);
+	                int slot = p.getSelectedSlot();
+	                client.network.sendPacket(new constructors.packet.PacketConstructorSize(slot, actualSize));
+	                
+	                if (p.getLevel() != null && p.getLevel().hudManager != null) {
+	                    String sizeText = Localization.translate("terraformer", "shapeadjustment") + " " + actualSize;
+	                    p.getLevel().hudManager.addElement(new necesse.level.maps.hudManager.floatText.FloatTextFade((int) p.x, (int) p.y - 30, sizeText, new necesse.gfx.gameFont.FontOptions(16).color(Color.WHITE)));
+	                }
+	            }
 	        }
-	        if (!itemSelected && this.active) {
-	            this.active = false;
-	            lastActivationEventTime = currentTime;
-	            this.onDeactivateEvent();
-	        }
-	    }
-	    
-	    // Handle key press events
-	    boolean sizeUpPressed = Control.getControl("terraformersizeup").isDown() || Control.getControl("terraformersizeup").isPressed();
-	    boolean sizeDownPressed = Control.getControl("terraformersizedown").isDown() || Control.getControl("terraformersizedown").isPressed();
-
-	    if (sizeUpPressed && !isSizeUpPressed) {
-	        modShapeSize(1, me);
-	        isSizeUpPressed = true;
-	    } else if (!sizeUpPressed) {
-	        isSizeUpPressed = false;
-	    }
-
-	    if (sizeDownPressed && !isSizeDownPressed) {
-	        modShapeSize(-1, me);
-	        isSizeDownPressed = true;
-	    } else if (!sizeDownPressed) {
-	        isSizeDownPressed = false;
 	    }
 	}
 	
@@ -387,25 +379,29 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 			this.item = item;
 		}
 		
-		public int shapeSize() 	{	return item != null ? item.shapeSize : 3;		}
+		public int shapeSize(InventoryItem me) {
+			return item != null ? item.getShapeSize(me) : 3;
+		}
 		
-		public int maxSize(InventoryItem _me) 	{	return item != null ? item.maxShapeSize.getValue(item.getUpgradeTier(_me)) 	: 10;		}
+		public int maxSize(InventoryItem me) {
+			return item != null ? item.maxShapeSize.getValue(item.getUpgradeTier(me)) : 5;
+		}
 		
-		public int minSize() 	{	return item != null ? item.minShapeSize 	: 1;		}
+		public int minSize() {
+			return item != null ? item.minShapeSize : 1;
+		}
 			
-		public abstract LevelTile[][] getTilesAround(PlayerMob player, TilePosition p);
-		
+		public abstract LevelTile[][] getTilesAround(PlayerMob player, TilePosition p, int currentSize);
 	}
 	
-	public static class ShapeSelectionSquare extends ShapeSelection{		
-		
-		public ShapeSelectionSquare(ConstructorItem item) {		super(item, Shape.SQUARE, "square");	}
+	public static class ShapeSelectionSquare extends ShapeSelection {		
+		public ShapeSelectionSquare(ConstructorItem item) {
+			super(item, Shape.SQUARE, "square");
+		}
 
 		@Override
-		public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p) {
-			
-			int currentSize = shapeSize();
-		    if (shapeSize() == 0 || player == null) return new LevelTile[0][0];
+		public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p, int currentSize) {
+		    if (currentSize <= 0 || player == null || p == null) return new LevelTile[0][0];
 		    
 		    Level l = player.getLevel();
 		    LevelTile[][] shape = new LevelTile[currentSize][currentSize];
@@ -426,19 +422,16 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 		    }
 		    return shape;
 		}
-		
 	}
 	
 	public static class ShapeSelectionLineBox extends ShapeSelection {        
-	    
 	    public ShapeSelectionLineBox(ConstructorItem item) {        
 	        super(item, Shape.LINE_BOX, "linebox");    
 	    }
 
 	    @Override
-	    public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p) {
-	        int currentSize = shapeSize();
-	        if (currentSize == 0 || player == null) return new LevelTile[0][0];
+	    public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p, int currentSize) {
+	        if (currentSize <= 0 || player == null || p == null) return new LevelTile[0][0];
 	        
 	        Level l = player.getLevel();
 	        LevelTile[][] shape = new LevelTile[currentSize][currentSize];
@@ -452,11 +445,10 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 	        for (int x = startX; x <= endX; x++) { 
 	            int _y = 0;
 	            for (int y = startY; y <= endY; y++) { 
-	                // Only select border tiles (top, bottom, left, right)
 	                if (x == startX || x == endX || y == startY || y == endY) {
 	                    shape[_x][_y] = l.getLevelTile(x, y);
 	                } else {
-	                    shape[_x][_y] = null; // Keep the inner part empty
+	                    shape[_x][_y] = null;
 	                }
 	                _y++;
 	            }
@@ -466,17 +458,14 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 	    }
 	}
 
-	
 	public static class ShapeSelectionCheckerboard extends ShapeSelection {
-	    
 	    public ShapeSelectionCheckerboard(ConstructorItem item) {
 	        super(item, Shape.CHECKERBOARD, "checkerboard");
 	    }
 
 	    @Override
-	    public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p) {
-	        int currentSize = shapeSize();
-	        if (currentSize == 0 || player == null) return new LevelTile[0][0];
+	    public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p, int currentSize) {
+	        if (currentSize <= 0 || player == null || p == null) return new LevelTile[0][0];
 	        
 	        Level l = player.getLevel();
 	        LevelTile[][] shape = new LevelTile[currentSize][currentSize];
@@ -487,9 +476,9 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 	        int endY = p.tileY + (currentSize / 2) + (currentSize % 2 == 0 ? -1 : 0);
 	        
 	        int _x = 0;
-	        for (int x = startX; x <= endX; x++) {
+	        for (int x = startX; x <= endX; x++) { 
 	            int _y = 0;
-	            for (int y = startY; y <= endY; y++) {
+	            for (int y = startY; y <= endY; y++) { 
 	                if ((_x + _y) % 2 == 0) {
 	                    shape[_x][_y] = l.getLevelTile(x, y);
 	                } else {
@@ -504,20 +493,18 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 	}
 
 	public static class ShapeSelectionCircle extends ShapeSelection {
-
 	    public ShapeSelectionCircle(ConstructorItem item) {
 	        super(item, Shape.CIRCLE, "circle");	  
 	    }
 	    
 	    @Override
-	    public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p) {
-	    	
-	    	int currentSize = shapeSize();
-	        if (shapeSize() < 3) return new LevelTile[0][0];	        
+	    public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p, int currentSize) {
+	    	if (currentSize < 3 || player == null || p == null) return new LevelTile[0][0];	        
 	        
 		    Level l = player.getLevel();
 	        int radius = currentSize / 2;
 	        int diameter = radius * 2 + 1;
+	        int radiusSq = radius * radius;
 
 	        LevelTile[][] shape = new LevelTile[diameter][diameter];
 
@@ -526,17 +513,13 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 
 	        for (int x = -radius; x <= radius; x++) {
 	            for (int y = -radius; y <= radius; y++) {
-	                int worldX = centerX + x;
-	                int worldY = centerY + y;
-
-	                // Check if within circle equation
-	                double distance = Math.sqrt(x * x + y * y);
-	                if (distance <= radius) {
+	                int distSq = x * x + y * y;
+	                if (distSq <= radiusSq) {
 	                    int _x = x + radius;
 	                    int _y = y + radius;
 
 	                    if (_x >= 0 && _x < diameter && _y >= 0 && _y < diameter) {
-	                        shape[_x][_y] = l.getLevelTile(worldX, worldY);
+	                        shape[_x][_y] = l.getLevelTile(centerX + x, centerY + y);
 	                    }
 	                }
 	            }
@@ -547,24 +530,25 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 	}
 	
 	public static class ShapeSelectionRing extends ShapeSelection {
-
 	    public ShapeSelectionRing(ConstructorItem item) {
 	        super(item, Shape.RING, "ring");
 	    }
 	    
 	    @Override
-	    public int minSize() 	{	return this.item != null ? Math.max(3, this.item.minShapeSize) 	: 3;		}
+	    public int minSize() {
+	    	return this.item != null ? Math.max(3, this.item.minShapeSize) : 3;
+	    }
 
 	    @Override
-	    public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p) {
-	    	
-	    	int currentSize = shapeSize();
-	        if (currentSize < 3) return new LevelTile[0][0];
+	    public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p, int currentSize) {
+	    	if (currentSize < 3 || player == null || p == null) return new LevelTile[0][0];
 	        Level l = player.getLevel();
 
 	        int radius = currentSize / 2;
-	        int innerRadius = Math.max(1, radius - 1); // Ensures a hollow center
+	        int innerRadius = Math.max(1, radius - 1);
 	        int diameter = radius * 2 + 1;
+	        int radiusSq = radius * radius;
+	        int innerRadiusSq = innerRadius * innerRadius;
 
 	        LevelTile[][] shape = new LevelTile[diameter][diameter];
 
@@ -573,19 +557,13 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 
 	        for (int x = -radius; x <= radius; x++) {
 	            for (int y = -radius; y <= radius; y++) {
-	                int worldX = centerX + x;
-	                int worldY = centerY + y;
-
-	                // Compute distance from the center
-	                double distance = Math.sqrt(x * x + y * y);
-
-	                // Include only tiles between inner and outer radius
-	                if (distance <= radius && distance >= innerRadius) {
+	                int distSq = x * x + y * y;
+	                if (distSq <= radiusSq && distSq >= innerRadiusSq) {
 	                    int _x = x + radius;
 	                    int _y = y + radius;
 
 	                    if (_x >= 0 && _x < diameter && _y >= 0 && _y < diameter) {
-	                        shape[_x][_y] = l.getLevelTile(worldX, worldY);
+	                        shape[_x][_y] = l.getLevelTile(centerX + x, centerY + y);
 	                    }
 	                }
 	            }
@@ -596,74 +574,32 @@ public abstract class ConstructorItem extends PouchItem implements TickItem, Upg
 	}
 	
 	public static class ShapeSelectionLine extends ShapeSelection {		  
-
-	    private LineDirection direction;
-
-	    public ShapeSelectionLine(ConstructorItem item, LineDirection direction) {
+	    public ShapeSelectionLine(ConstructorItem item) {
 	        super(item, Shape.LINE, "line");
-	        this.direction = direction;
 	    }
 
 	    @Override
-	    public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p) {
-	    	
-	    	int currentSize = shapeSize();
-	        if (currentSize == 0) return new LevelTile[0][0];	        
+	    public LevelTile[][] getTilesAround(PlayerMob player, TilePosition p, int currentSize) {
+	    	if (currentSize <= 0 || player == null || p == null) return new LevelTile[0][0];	        
 	        Level l = player.getLevel();
 	        
-	        LevelTile[][] shape;
-	        if (direction == LineDirection.HORIZONTAL) {
-	            shape = new LevelTile[1][currentSize]; 
-	        } else if (direction == LineDirection.VERTICAL) {
-	            shape = new LevelTile[currentSize][1]; 
-	        } else {
-	            shape = new LevelTile[currentSize][currentSize]; 
-	        }
+	        boolean vertical = (player.getDir() == 0 || player.getDir() == 2);
+	        LevelTile[][] shape = vertical ? new LevelTile[currentSize][1] : new LevelTile[1][currentSize];
 
 	        int startX = p.tileX;
 	        int startY = p.tileY;
 
 	        for (int i = 0; i < currentSize; i++) {
-	            int x = startX;
-	            int y = startY;
-
-	            switch (direction) {
-	                case HORIZONTAL:
-	                    x = startX - (currentSize / 2) + i;
-	                    y = startY;
-	                    if (i >= 0 && i < currentSize) shape[0][i] = l.getLevelTile(x, y);
-	                    break;
-
-	                case VERTICAL:
-	                    x = startX;
-	                    y = startY - (currentSize / 2) + i;
-	                    if (i >= 0 && i < currentSize) shape[i][0] = l.getLevelTile(x, y);
-	                    break;
-
-	                case DIAGONAL_TL_BR:
-	                    x = startX - (currentSize / 2) + i;
-	                    y = startY - (currentSize / 2) + i;
-	                    if (i >= 0 && i < currentSize) shape[i][i] = l.getLevelTile(x, y);
-	                    break;
-
-	                case DIAGONAL_TR_BL:
-	                    x = startX + (currentSize / 2) - i;
-	                    y = startY - (currentSize / 2) + i;
-	                    if (i >= 0 && i < currentSize) shape[i][currentSize - i - 1] = l.getLevelTile(x, y);
-	                    break;
+	            if (vertical) {
+	                int y = startY - (currentSize / 2) + i;
+	                shape[i][0] = l.getLevelTile(startX, y);
+	            } else {
+	                int x = startX - (currentSize / 2) + i;
+	                shape[0][i] = l.getLevelTile(x, startY);
 	            }
 	        }
 
 	        return shape;
-	    }
-
-	    public ShapeSelectionLine setDirection(LineDirection direction) {
-	        this.direction = direction;
-	        return this;
-	    }
-
-	    public LineDirection getDirection() {
-	        return direction;
 	    }
 	}
 }

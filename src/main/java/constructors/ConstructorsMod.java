@@ -25,19 +25,20 @@ public class ConstructorsMod {
 	public static int BUILDER_CONTAINER;
 	public static int TERRAFORMER_ITEM;
 	public static int BUILDER_ITEM;
+	public static Control SIZE_UP;
+	public static Control SIZE_DOWN;
+
     public void init() {
     	
     	TERRAFORMER_CONTAINER = ContainerRegistry.registerContainer((client, uniqueSeed, content) -> {
-        	 
-			return new TerraformerContainerForm<TerraformerContainer>(client,					
+			return new TerraformerContainerForm(client,					
 					new TerraformerContainer(client.getClient(), uniqueSeed, content));	
 		}, (client, uniqueSeed, content, serverObject) -> {
 			return new TerraformerContainer(client, uniqueSeed, content);
 		});
     	
     	BUILDER_CONTAINER = ContainerRegistry.registerContainer((client, uniqueSeed, content) -> {
-       	 
-			return new BuilderContainerForm<BuilderContainer>(client,					
+			return new BuilderContainerForm(client,					
 					new BuilderContainer(client.getClient(), uniqueSeed, content));	
 		}, (client, uniqueSeed, content, serverObject) -> {
 			return new BuilderContainer(client, uniqueSeed, content);
@@ -45,13 +46,18 @@ public class ConstructorsMod {
          
     	TERRAFORMER_ITEM = ItemRegistry.registerItem("terraformer", new TerraformerItem(), 5000, true);
     	BUILDER_ITEM = ItemRegistry.registerItem("builder", new BuilderItem(), 5000, true);
-    	
-    	Control.addModControl(new Control(InputID.KEY_PERIOD, "terraformersizeup", new necesse.engine.localization.message.LocalMessage("terraformer", "terraformercontrolsizeup")));
-    	Control.addModControl(new Control(InputID.KEY_COMMA,  "terraformersizedown", new necesse.engine.localization.message.LocalMessage("terraformer", "terraformercontrolsizedown")));
 
+    	necesse.engine.registries.PacketRegistry.registerPacket(constructors.packet.PacketConstructorSize.class);
+    	
+    	SIZE_UP = Control.addModControl(new Control(InputID.KEY_PERIOD, "terraformersizeup", new necesse.engine.localization.message.LocalMessage("terraformer", "terraformercontrolsizeup")));
+    	SIZE_DOWN = Control.addModControl(new Control(InputID.KEY_COMMA,  "terraformersizedown", new necesse.engine.localization.message.LocalMessage("terraformer", "terraformercontrolsizedown")));
     }
+
     public void initResources() {
     	ConstructorTileDrawable.highlightTexture = GameTexture.fromFile("tiles/tile_highlight");
     	ResourceEncoder.addModResources(LoadedMod.getRunningMod());
+    }
+
+    public void postInit() {
     }
 }

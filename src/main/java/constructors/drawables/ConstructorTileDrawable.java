@@ -63,62 +63,58 @@ public class ConstructorTileDrawable<T> extends SortedDrawable{
 		
 		@Override
 		public void draw(TickManager arg0) {
+			if (highlightTexture == null || targetTiles == null || perspective == null) return;
 			
-			for(int x=0;x<targetTiles.length;x++) {
-				for(int y=0;y<targetTiles[x].length;y++) {
-					
+			int maxRangeSq = maxRange * maxRange;
+			int playerTileX = perspective.getTileX();
+			int playerTileY = perspective.getTileY();
+
+			for (int x = 0; x < targetTiles.length; x++) {
+				for (int y = 0; y < targetTiles[x].length; y++) {
 					LevelTile targetTile = targetTiles[x][y];
-					if(targetTile==null) continue;
+					if (targetTile == null) continue;
 					int tileX = targetTile.tileX;
 					int tileY = targetTile.tileY;	
 					
-					
 					TileHighlightType highlightType = TileHighlightType.ALREADY_PAINTED_TILE;
 					
-					if(x == 0 && y == 0) {
+					if (x == 0 && y == 0) {
 						highlightType = TileHighlightType.SAMPLER_TILE;
 					}
 					
-					int dx = tileX - perspective.getTileX();
-					int dy = tileY - perspective.getTileY();
+					int dx = tileX - playerTileX;
+					int dy = tileY - playerTileY;
 					
-					if((dx * dx + dy * dy) > (maxRange * maxRange)) {
+					if ((dx * dx + dy * dy) > maxRangeSq) {
 						highlightType = TileHighlightType.OUT_OF_RANGE;
-					}	else {
-						
-						if(this.inBucketID != -1) {							
-							if(this.isTilePred.apply(targetTileComparisonObjectGetter.apply(targetTile), this.inBucketID)){
+					} else {
+						if (this.inBucketID != -1) {							
+							if (this.isTilePred.apply(targetTileComparisonObjectGetter.apply(targetTile), this.inBucketID)) {
 								highlightType = TileHighlightType.PAINTABLE_TILE;
 							}
 						}
-						
 					}				
 									
 					GameLight light = this._level.getLightLevel(tileX, tileY);
 					int drawX = this._camera.getTileDrawX(tileX);
 					int drawY = this._camera.getTileDrawY(tileY);
-					GameTexture texture =  highlightTexture;
 					
 					Color mult = null;
-					if(highlightType == TileHighlightType.SAMPLER_TILE) mult = Color.YELLOW;
-					if(highlightType == TileHighlightType.OUT_OF_RANGE) mult = Color.RED;
-					if(highlightType == TileHighlightType.PAINTABLE_TILE) mult = Color.GREEN;
+					if (highlightType == TileHighlightType.SAMPLER_TILE) mult = Color.YELLOW;
+					else if (highlightType == TileHighlightType.OUT_OF_RANGE) mult = Color.RED;
+					else if (highlightType == TileHighlightType.PAINTABLE_TILE) mult = Color.GREEN;
 					
-					TextureDrawOptionsEnd m = texture.initDraw().size(32, 32).light(light).alpha(.8F);
-					
-					if(mult != null) {
+					TextureDrawOptionsEnd m = highlightTexture.initDraw().size(32, 32).light(light).alpha(0.8F);
+					if (mult != null) {
 						m.colorMult(mult);
 					}
-				
 					m.draw(drawX, drawY);
 					
-					if(this.perTileDrawStep!=null) {
+					if (this.perTileDrawStep != null) {
 						this.perTileDrawStep.draw(_level, perspective, targetTile, highlightType);
 					}
 				}
 			}
-			
-			
 		}
 
 		@Override
